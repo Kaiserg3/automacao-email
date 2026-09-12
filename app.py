@@ -79,7 +79,10 @@ with aba1:
     st.subheader("Enviar planilha")
     arquivo_planilha = st.file_uploader("Envie sua planilha de contatos (.xlsx)", type=["xlsx"])
 
-    if arquivo_planilha is not None:
+    if "ultimo_arquivo_id" not in st.session_state:
+        st.session_state.ultimo_arquivo_id = None
+
+    if arquivo_planilha is not None and arquivo_planilha.file_id != st.session_state.ultimo_arquivo_id:
         planilha = openpyxl.load_workbook(arquivo_planilha)
         aba = planilha.active
 
@@ -94,12 +97,25 @@ with aba1:
             novos_contatos.append(contato)
 
         st.session_state.contatos.extend(novos_contatos)
+        st.session_state.ultimo_arquivo_id = arquivo_planilha.file_id
         st.success(f"{len(novos_contatos)} contato(s) carregado(s) da planilha!")
 
     st.divider()
     st.subheader(f"Contatos atuais ({len(st.session_state.contatos)})")
+
     if st.session_state.contatos:
-        st.dataframe(st.session_state.contatos, use_container_width=True, hide_index=True)
+        contatos_editados = st.data_editor(
+            st.session_state.contatos,
+            use_container_width=True,
+            hide_index=True,
+            num_rows="dynamic",
+            key="editor_contatos"
+        )
+
+        # Remove linhas em branco (ex: linha nova criada mas ainda sem email)
+        st.session_state.contatos = [
+            c for c in contatos_editados if c.get("email")
+        ]
 
 # --- ABA 2: Template ---
 with aba2:
@@ -141,7 +157,6 @@ with aba2:
 
         if extensao in ["png", "jpg", "jpeg", "gif", "webp"]:
             st.image(st.session_state.anexo_dados, caption=anexo.name, width=400)
-
         elif extensao == "pdf":
             import base64
             base64_pdf = base64.b64encode(st.session_state.anexo_dados).decode("utf-8")
@@ -151,24 +166,53 @@ with aba2:
             )
         else:
             st.info(f"Pré-visualização não disponível para arquivos .{extensao} — o anexo será enviado normalmente.")
-
     else:
         st.session_state.anexo_dados = None
         st.session_state.anexo_nome = None
 
 # --- ABA 3: Enviar ---
 with aba3:
-    contatos = st.session_state.contatos
+    contatos_completos = st.session_state.contatos
 
-    if not contatos:
+    if not contatos_completos:
         st.warning("Adicione contatos na aba 'Contatos' primeiro.")
     else:
-        st.write(f"**{len(contatos)}** contato(s) prontos para processar.")
+        st.subheader("Selecione os contatos para esta campanha")
+
+        contatos_para_tabela = []
+        for contato in contatos_completos:
+            linha = dict(contato)
+            linha["Selecionado"] = True
+            contatos_para_tabela.append(linha)
+
+        contatos_editados = st.data_editor(
+            contatos_para_tabela,
+            use_container_width=False,
+            hide_index=True,
+            disabled=[c for c in st.session_state.colunas],
+            column_order=st.session_state.colunas + ["Selecionado"],
+            column_config={
+                col: st.column_config.Column(width=220) for col in st.session_state.colunas
+            } | {
+                "Selecionado": st.column_config.CheckboxColumn(width=70)
+            },
+            key="tabela_selecao"
+        )
+
+        contatos = [
+            {k: v for k, v in linha.items() if k != "Selecionado"}
+            for linha in contatos_editados
+            if linha["Selecionado"]
+        ]
+
+        st.write(f"**{len(contatos)}** de **{len(contatos_completos)}** contato(s) selecionado(s) para esta campanha.")
 
         if st.session_state.anexo_nome:
             st.caption(f"📎 Anexo configurado: {st.session_state.anexo_nome}")
 
-        if st.button("📤 Enviar emails", type="primary"):
+        if not contatos:
+            st.info("Selecione ao menos um contato para habilitar o envio.")
+        elif st.button("📤 Enviar emails", type="primary"):
             dados_anexo = st.session_state.get("anexo_dados")
             nome_anexo = st.session_state.get("anexo_nome")
 
