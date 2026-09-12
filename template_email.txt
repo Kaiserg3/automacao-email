@@ -1,0 +1,13 @@
+Olá, {nome},
+
+Meu nome é [seu nome], da [nome da sua empresa]. Trabalhamos com palestras e treinamentos corporativos voltados para o desenvolvimento de equipes, e imaginei que isso poderia ser relevante para a {empresa}.
+
+Nossos treinamentos abordam temas como [liderança, produtividade, comunicação, etc.], sempre adaptados à realidade de cada empresa.
+
+Se fizer sentido, ficaria feliz em agendar uma conversa rápida de 15 minutos para entender melhor as necessidades da {empresa} e ver se há um encaixe.
+
+Fico à disposição!
+
+Atenciosamente,
+[seu nome]
+[seu cargo / empresa]
