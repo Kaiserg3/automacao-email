@@ -4,31 +4,32 @@ import smtplib
 import os
 import time
 from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
+from email import encoders
 from dotenv import load_dotenv
 from email_validator import validate_email, EmailNotValidError
 
 st.set_page_config(page_title="Sistema de Envio de Emails", layout="wide")
 st.title("📧 Sistema de Envio de Emails")
 
-# "session_state" guarda dados que precisam sobreviver entre uma ação e outra
-# (sem isso, cada clique faria o Streamlit "esquecer" os contatos já carregados)
 if "contatos" not in st.session_state:
     st.session_state.contatos = []
 if "colunas" not in st.session_state:
     st.session_state.colunas = ["nome", "email", "empresa", "cargo"]
+if "mostrar_form_contato" not in st.session_state:
+    st.session_state.mostrar_form_contato = False
+if "campos_novo_contato" not in st.session_state:
+    st.session_state.campos_novo_contato = [{"campo": "email", "valor": ""}]
+if "anexo_dados" not in st.session_state:
+    st.session_state.anexo_dados = None
+if "anexo_nome" not in st.session_state:
+    st.session_state.anexo_nome = None
 
 aba1, aba2, aba3 = st.tabs(["1️⃣ Contatos", "2️⃣ Template", "3️⃣ Enviar"])
 
 # --- ABA 1: Contatos ---
 with aba1:
-    # Controla se o formulário de contato manual está visível ou não
-    if "mostrar_form_contato" not in st.session_state:
-        st.session_state.mostrar_form_contato = False
-
-    # Controla os campos que o usuário está montando na hora
-    if "campos_novo_contato" not in st.session_state:
-        st.session_state.campos_novo_contato = [{"campo": "email", "valor": ""}]
-
     col_botao, col_resto = st.columns([1, 6])
     with col_botao:
         if st.button("➕", help="Adicionar contato manualmente"):
@@ -41,7 +42,6 @@ with aba1:
             col_nome, col_valor = st.columns(2)
             with col_nome:
                 if i == 0:
-                    # Primeira linha travada como "email" (não pode editar o nome do campo)
                     st.text_input("Nome do campo", value="email", disabled=True, key=f"campo_nome_{i}")
                     linha["campo"] = "email"
                 else:
@@ -65,12 +65,11 @@ with aba1:
                     st.error("O campo 'email' precisa ter um valor.")
                 else:
                     st.session_state.contatos.append(contato)
-                    # Atualiza a lista de colunas conhecidas, incluindo campos novos
                     for chave in contato:
                         if chave not in st.session_state.colunas:
                             st.session_state.colunas.append(chave)
 
-                    st.success(f"Contato adicionado!")
+                    st.success("Contato adicionado!")
                     st.session_state.campos_novo_contato = [{"campo": "email", "valor": ""}]
                     st.session_state.mostrar_form_contato = False
                     st.rerun()
@@ -104,35 +103,58 @@ with aba1:
 
 # --- ABA 2: Template ---
 with aba2:
-    st.write(f"Campos disponíveis para usar no template: {', '.join('{' + c + '}' for c in st.session_state.colunas)}")
+    campos_existentes = set()
+    for contato in st.session_state.contatos:
+        campos_existentes.update(contato.keys())
 
-    template_padrao = """Olá, {nome},
-
-Meu nome é [seu nome], da [nome da sua empresa]. Trabalhamos com palestras e treinamentos corporativos voltados para o desenvolvimento de equipes, e imaginei que isso poderia ser relevante para a {empresa}.
-
-Nossos treinamentos abordam temas como [liderança, produtividade, comunicação, etc.], sempre adaptados à realidade de cada empresa.
-
-Se fizer sentido, ficaria feliz em agendar uma conversa rápida de 15 minutos para entender melhor as necessidades da {empresa} e ver se há um encaixe.
-
-Fico à disposição!
-
-Atenciosamente,
-[seu nome]
-[seu cargo / empresa]"""
+    if campos_existentes:
+        st.caption(f"Campos disponíveis: {', '.join('{' + c + '}' for c in sorted(campos_existentes))}")
+    else:
+        st.caption("Adicione contatos na aba anterior para ver quais campos estão disponíveis.")
 
     template = st.text_area(
-        "Edite o texto do email:",
-        value=template_padrao,
+        "Texto do email:",
+        value="",
+        placeholder="Escreva aqui o texto do seu email. Use chaves para inserir dados do contato, como {nome} ou {empresa}.",
         height=300
     )
 
-    if st.session_state.contatos:
+    if st.session_state.contatos and template:
         with st.expander("👁️ Pré-visualização (usando o primeiro contato)"):
             try:
                 preview = template.format(**st.session_state.contatos[0])
                 st.text(preview)
             except KeyError as campo_faltando:
                 st.warning(f"O template usa o campo {campo_faltando}, que não existe nesse contato.")
+
+    st.divider()
+    st.subheader("Anexo (opcional)")
+    anexo = st.file_uploader("Anexar arquivo a todos os emails", type=None, key="anexo_uploader")
+
+    if anexo is not None:
+        st.session_state.anexo_dados = anexo.read()
+        st.session_state.anexo_nome = anexo.name
+        tamanho_kb = len(st.session_state.anexo_dados) / 1024
+        st.caption(f"📎 {anexo.name} ({tamanho_kb:.1f} KB)")
+
+        extensao = anexo.name.lower().split(".")[-1]
+
+        if extensao in ["png", "jpg", "jpeg", "gif", "webp"]:
+            st.image(st.session_state.anexo_dados, caption=anexo.name, width=400)
+
+        elif extensao == "pdf":
+            import base64
+            base64_pdf = base64.b64encode(st.session_state.anexo_dados).decode("utf-8")
+            st.markdown(
+                f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="500" type="application/pdf"></iframe>',
+                unsafe_allow_html=True
+            )
+        else:
+            st.info(f"Pré-visualização não disponível para arquivos .{extensao} — o anexo será enviado normalmente.")
+
+    else:
+        st.session_state.anexo_dados = None
+        st.session_state.anexo_nome = None
 
 # --- ABA 3: Enviar ---
 with aba3:
@@ -143,7 +165,13 @@ with aba3:
     else:
         st.write(f"**{len(contatos)}** contato(s) prontos para processar.")
 
+        if st.session_state.anexo_nome:
+            st.caption(f"📎 Anexo configurado: {st.session_state.anexo_nome}")
+
         if st.button("📤 Enviar emails", type="primary"):
+            dados_anexo = st.session_state.get("anexo_dados")
+            nome_anexo = st.session_state.get("anexo_nome")
+
             load_dotenv()
             email_remetente = os.getenv("EMAIL_REMETENTE")
             senha_app = os.getenv("SENHA_APP")
@@ -182,10 +210,22 @@ with aba3:
                         validate_email(email)
                         corpo = template.format(**contato)
 
-                        mensagem = MIMEText(corpo, "plain", "utf-8")
+                        mensagem = MIMEMultipart()
                         mensagem["Subject"] = f"Treinamentos que fortalecem a equipe da {empresa}" if empresa else "Treinamentos para sua equipe"
                         mensagem["From"] = email_remetente
                         mensagem["To"] = email
+
+                        mensagem.attach(MIMEText(corpo, "plain", "utf-8"))
+
+                        if dados_anexo is not None:
+                            parte_anexo = MIMEBase("application", "octet-stream")
+                            parte_anexo.set_payload(dados_anexo)
+                            encoders.encode_base64(parte_anexo)
+                            parte_anexo.add_header(
+                                "Content-Disposition",
+                                f"attachment; filename={nome_anexo}"
+                            )
+                            mensagem.attach(parte_anexo)
 
                         servidor.sendmail(email_remetente, email, mensagem.as_string())
                         total_enviados += 1
