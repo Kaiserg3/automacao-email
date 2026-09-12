@@ -3,6 +3,7 @@ import openpyxl
 import smtplib
 import os
 import time
+import json
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
@@ -25,6 +26,8 @@ if "anexo_dados" not in st.session_state:
     st.session_state.anexo_dados = None
 if "anexo_nome" not in st.session_state:
     st.session_state.anexo_nome = None
+if "template_atual" not in st.session_state:
+    st.session_state.template_atual = ""
 
 aba1, aba2, aba3 = st.tabs(["1️⃣ Contatos", "2️⃣ Template", "3️⃣ Enviar"])
 
@@ -112,7 +115,6 @@ with aba1:
             key="editor_contatos"
         )
 
-        # Remove linhas em branco (ex: linha nova criada mas ainda sem email)
         st.session_state.contatos = [
             c for c in contatos_editados if c.get("email")
         ]
@@ -128,12 +130,48 @@ with aba2:
     else:
         st.caption("Adicione contatos na aba anterior para ver quais campos estão disponíveis.")
 
+    if "templates_salvos" not in st.session_state:
+        try:
+            with open("templates.json", "r", encoding="utf-8") as arq:
+                st.session_state.templates_salvos = json.load(arq)
+        except FileNotFoundError:
+            st.session_state.templates_salvos = {}
+
+    if st.session_state.templates_salvos:
+        opcoes = ["(nenhum — escrever do zero)"] + list(st.session_state.templates_salvos.keys())
+        escolha = st.selectbox("Carregar template salvo:", opcoes)
+
+        if escolha != "(nenhum — escrever do zero)":
+            st.session_state.template_atual = st.session_state.templates_salvos[escolha]
+
     template = st.text_area(
         "Texto do email:",
-        value="",
+        value=st.session_state.template_atual,
         placeholder="Escreva aqui o texto do seu email. Use chaves para inserir dados do contato, como {nome} ou {empresa}.",
-        height=300
+        height=300,
+        key="campo_template"
     )
+    st.session_state.template_atual = template
+
+    col_nome, col_salvar = st.columns([3, 1])
+    with col_nome:
+        nome_template = st.text_input("Nome para salvar este template:", placeholder="Ex: Primeiro contato")
+    with col_salvar:
+        st.write("")
+        st.write("")
+        if st.button("💾 Salvar template"):
+            if not nome_template:
+                st.error("Dê um nome ao template antes de salvar.")
+            elif not template:
+                st.error("O texto do template está vazio.")
+            else:
+                st.session_state.templates_salvos[nome_template] = template
+
+                with open("templates.json", "w", encoding="utf-8") as arq:
+                    json.dump(st.session_state.templates_salvos, arq, ensure_ascii=False, indent=2)
+
+                st.success(f"Template '{nome_template}' salvo!")
+                st.rerun()
 
     if st.session_state.contatos and template:
         with st.expander("👁️ Pré-visualização (usando o primeiro contato)"):
