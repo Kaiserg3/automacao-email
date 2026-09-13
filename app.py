@@ -248,6 +248,26 @@ with aba3:
         if st.session_state.anexo_nome:
             st.caption(f"📎 Anexo configurado: {st.session_state.anexo_nome}")
 
+        st.divider()
+        st.subheader("Configuração de envio")
+
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            intervalo_individual = st.number_input(
+                "Segundos entre cada email", min_value=1, max_value=300, value=5
+            )
+        with col2:
+            tamanho_lote = st.number_input(
+                "Emails por lote", min_value=1, max_value=1000, value=20
+            )
+        with col3:
+            pausa_lote_min = st.number_input(
+                "Pausa entre lotes (minutos)", min_value=0, max_value=180, value=0
+            )
+
+        if pausa_lote_min > 0:
+            st.caption("⚠️ Com pausa entre lotes, mantenha o navegador e o computador ligados durante todo o envio.")
+
         if not contatos:
             st.info("Selecione ao menos um contato para habilitar o envio.")
         elif st.button("📤 Enviar emails", type="primary"):
@@ -334,7 +354,12 @@ with aba3:
                 barra_progresso.progress((i + 1) / len(contatos))
                 resumo.info(f"✅ Enviados: {total_enviados} | ⚠️ Falhas: {total_falhas} | ⏭️ Pulados: {total_pulados}")
 
-                time.sleep(5)
+                time.sleep(intervalo_individual)
+
+                if pausa_lote_min > 0 and (i + 1) % tamanho_lote == 0 and (i + 1) < len(contatos):
+                    st.info(f"⏸️ Lote de {tamanho_lote} concluído. Pausando por {pausa_lote_min} minuto(s)...")
+                    time.sleep(pausa_lote_min * 60)
 
             servidor.quit()
             st.success("Campanha finalizada!")
+
