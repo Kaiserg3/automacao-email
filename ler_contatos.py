@@ -110,12 +110,3 @@ print(f"✅ Enviados com sucesso: {total_enviados}")
 print(f"❌ Falharam: {total_falhas}")
 print(f"⏭️  Pulados (duplicados/inválidos): {total_pulados}")
 print("=" * 50)
-
-# Para criar o ambiente virtual (só precisa fazer uma vez):
-# python -m venv venv
-
-# Para ativar o ambiente virtual (Windows):
-# venv\Scripts\activate
-
-# Para rodar o código:
-# python ler_contatos.py
