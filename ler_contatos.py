@@ -1,3 +1,5 @@
+# =========== 1. IMPORTAÇÕES E VARIÁVEIS DE AMBIENTE ===========
+# 1.1 Importação de bibliotecas
 import openpyxl
 import smtplib
 import os
@@ -6,29 +8,31 @@ from email.mime.text import MIMEText
 from dotenv import load_dotenv
 from email_validator import validate_email, EmailNotValidError
 
-# Carrega as variáveis do arquivo .env (EMAIL_REMETENTE e SENHA_APP)
+# 1.2 Carregamento do .env
 load_dotenv()
 email_remetente = os.getenv("EMAIL_REMETENTE")
 senha_app = os.getenv("SENHA_APP")
 
 ASSUNTO = "Treinamentos que fortalecem a equipe da {empresa}"
 
-# Abre a planilha e o template
+# =========== 2. LEITURA DE DADOS ===========
+# 2.1 Leitura da planilha de contatos
 planilha = openpyxl.load_workbook("contatos.xlsx")
 aba = planilha.active
 
+# 2.2 Leitura do template de texto
 with open("template_email.txt", "r", encoding="utf-8") as arquivo:
     template = arquivo.read()
 
-# Lê a lista de emails já enviados (começa vazia se o arquivo ainda não existir)
+# 2.3 Histórico de envios (enviados.txt)
 try:
     with open("enviados.txt", "r", encoding="utf-8") as arquivo:
         ja_enviados = set(linha.strip() for linha in arquivo)
 except FileNotFoundError:
     ja_enviados = set()
 
-
-# Verifica quais contatos são válidos, sem enviar nada ainda
+# =========== 3. VALIDAÇÃO PRÉVIA ===========
+# 3.1 Filtragem de contatos válidos e não enviados
 contatos_para_enviar = []
 for linha in aba.iter_rows(min_row=2, max_col=4, values_only=True):
     nome, email_destino, empresa, cargo = linha
@@ -42,6 +46,7 @@ for linha in aba.iter_rows(min_row=2, max_col=4, values_only=True):
     except EmailNotValidError:
         continue
 
+# 3.2 Confirmação do usuário no terminal
 print(f"📋 {len(contatos_para_enviar)} contato(s) receberão o email:")
 for nome, email_destino in contatos_para_enviar:
     print(f"   • {nome} ({email_destino})")
@@ -52,16 +57,17 @@ if confirmacao.lower() != "s":
     print("Envio cancelado.")
     exit()
     
-# Conecta no servidor do Gmail/Google Workspace
+# =========== 4. CONEXÃO E ENVIO ===========
+# 4.1 Autenticação no servidor SMTP
 servidor = smtplib.SMTP("smtp.gmail.com", 587)
 servidor.starttls()
 servidor.login(email_remetente, senha_app)
 
-# Contadores do relatório final
 total_enviados = 0
 total_falhas = 0
 total_pulados = 0
 
+# 4.2 Ciclo de envio e formatação
 for linha in aba.iter_rows(min_row=2, max_col=4, values_only=True):
     nome, email_destino, empresa, cargo = linha
 
@@ -104,6 +110,8 @@ for linha in aba.iter_rows(min_row=2, max_col=4, values_only=True):
 
 servidor.quit()
 
+# =========== 5. FINALIZAÇÃO ===========
+# 5.1 Relatório de envio
 print("=" * 50)
 print("📊 RELATÓRIO FINAL")
 print(f"✅ Enviados com sucesso: {total_enviados}")

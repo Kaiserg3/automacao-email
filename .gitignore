@@ -1,6 +1,31 @@
+# =========== 1. CREDENCIAIS E CONFIGURAÇÕES LOCAIS ===========
+
+# 1.1 Senhas e variáveis privadas
 .env
+.env.*
+!.env.example
+comandos.txt
+
+
+# =========== 2. AMBIENTES E ARQUIVOS TEMPORÁRIOS ===========
+
+# 2.1 Ambientes virtuais do Python
 venv/
+.venv/
+
+# 2.2 Cache e arquivos compilados
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+
+# =========== 3. DADOS LOCAIS DO SISTEMA ===========
+
+# 3.1 Banco SQLite e anexos armazenados
+data/
+
+# 3.2 Planilha e arquivos da versão anterior
 contatos.xlsx
 enviados.txt
-comandos.txt
 templates.json
+comandos.txt
